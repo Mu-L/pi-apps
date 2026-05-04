@@ -255,7 +255,7 @@ if ! grep -qxF "ExecStart=/usr/bin/zram.sh storage-off" /etc/systemd/system/zram
   #create a partition and mount it
   mkfs.ext4 -F -O ^has_journal,^metadata_csum,^orphan_file -b 4096 /dev/zram${storage_drive_num} >/dev/null
   mkdir -p /zram
-  mount /dev/zram${storage_drive_num} /zram
+  mount -o discard /dev/zram${storage_drive_num} /zram
   chmod -R 777 /zram #make writable for any user
   rmdir /zram/lost+found || true
 fi
