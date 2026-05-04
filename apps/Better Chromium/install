@@ -526,27 +526,34 @@ fi
 if [ "$reduce_writes" == TRUE ];then
   #mount chromium files to tmpfs (script will run with user's privileges whenever Chromium is launched)
   #From: https://forums.raspberrypi.com/viewtopic.php?p=1865820
-  echo "Adding ${folder}/reduce_writes script to mount cache/ServiceWorker to /dev/shm when Chromium launches"
+  echo "Adding ${folder}/reduce_writes script to mount cache/ServiceWorker to RAM when Chromium launches"
   cat << "EOF" | sudo tee "${folder}/reduce_writes" >/dev/null
 #!/bin/bash
 
-if [ ! -d /dev/shm ];then
+if [ -d /zram ] && zramctl -o MOUNTPOINT | grep -xq /zram ;then
+  #use zram filesystem if the more ram app is installed
+  ram_dir="/zram/chromium-${USER}-RAM"
+elif [ -d /dev/shm ];then
+  ram_dir="/dev/shm/chromium-${USER}-RAM"
+fi
+
+if [ -z "$ram_dir" ];then
   echo 'Better chromium "Reduce Writes" script: cannot mount folders to /dev/shm because that folder is missing!'
 else
-  rm -rf /dev/shm/chromium
-  mkdir -p /dev/shm/chromium
+  rm -rf $ram_dir
+  mkdir -p $ram_dir
   
   profiles="$(find "$HOME/.config/chromium/" -maxdepth 1 -type d '(' -name Default -o -name 'Profile *' ')' | sed 's+.*/++g')"
   echo "$profiles" | while read -r profile ;do
   
     rm -rf "$HOME/.config/chromium/$profile/Service Worker"
-    mkdir -p "/dev/shm/chromium/$profile/serviceWorker"
-    ln -s "/dev/shm/chromium/$profile/serviceWorker" "$HOME/.config/chromium/$profile/Service Worker"
+    mkdir -p "$ram_dir/$profile/serviceWorker"
+    ln -s "$ram_dir/$profile/serviceWorker" "$HOME/.config/chromium/$profile/Service Worker"
   done
   
-  mkdir -p /dev/shm/chromium/cache
+  mkdir -p "$ram_dir/cache"
   rm -rf "$HOME/.cache/chromium"
-  ln -s /dev/shm/chromium/cache/ "$HOME/.cache/chromium"
+  ln -s "$ram_dir/cache/" "$HOME/.cache/chromium"
 fi
 EOF
 else
